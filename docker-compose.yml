@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: secure-file-service
+    restart: always
+    ports:
+      - '${PORT:-3200}:${PORT:-3200}'
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - .env

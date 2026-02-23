@@ -1,0 +1,2 @@
+This is a test file for the secure file service.
+It should be locked with a password.

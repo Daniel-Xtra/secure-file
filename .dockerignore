@@ -1,0 +1,36 @@
+# Dependencies — reinstalled inside the image via npm ci
+node_modules
+
+# Compiled output — rebuilt inside the image via npm run build
+dist
+
+# Git
+.git
+.gitignore
+
+# Local env files — injected at runtime via docker-compose env_file
+.env
+.env.*
+
+# Editor / OS
+.vscode
+.idea
+*.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Test artefacts
+coverage
+test
+
+# Docker files themselves (not needed in context)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# CI
+.github

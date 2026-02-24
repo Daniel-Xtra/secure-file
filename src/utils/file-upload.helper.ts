@@ -2,12 +2,13 @@ import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express
 import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import { BadRequestException, CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import * as secrets from './secrets';
 
 // File upload configuration
 export const FILE_UPLOAD_CONFIG = {
-	MAX_FILE_SIZE: 3.5 * 1024 * 1024, // 3MB in bytes
-	ALLOWED_FILE_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
-	ALLOWED_FILE_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.pdf'],
+	MAX_FILE_SIZE: secrets.MAX_FILE_SIZE,
+	ALLOWED_FILE_TYPES: secrets.ALLOWED_FILE_TYPES,
+	ALLOWED_FILE_EXTENSIONS: secrets.ALLOWED_FILE_EXTENSIONS,
 	MIN_FILE_SIZE: 1, // Minimum file size in bytes (1 byte to ensure file is not empty)
 	// Magic numbers for file type validation (first few bytes of files)
 	MAGIC_NUMBERS: {
@@ -15,6 +16,7 @@ export const FILE_UPLOAD_CONFIG = {
 		'image/jpg': [0xff, 0xd8, 0xff],
 		'image/png': [0x89, 0x50, 0x4e, 0x47],
 		'application/pdf': [0x25, 0x50, 0x44, 0x46], // %PDF
+		'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [0x50, 0x4b, 0x03, 0x04], // ZIP signature for DOCX
 	},
 };
 
@@ -23,13 +25,12 @@ export const fileFilter: MulterOptions['fileFilter'] = (req, file, callback) => 
 	// Check file extension first
 	const fileExtension = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
 	if (!FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.includes(fileExtension)) {
-		return callback(new Error(`Invalid file extension. Allowed extensions: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.join(', ')}`), false);
+		return callback(new BadRequestException(`Invalid file extension. Allowed extensions: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.join(', ')}`), false);
 	}
 
-	// Check file mimetype, but be more lenient with application/octet-stream for image files
 	// Check file mimetype
 	if (!FILE_UPLOAD_CONFIG.ALLOWED_FILE_TYPES.includes(file.mimetype)) {
-		return callback(new Error(`Invalid file type. Allowed types: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.join(', ')}`), false);
+		return callback(new BadRequestException(`Invalid file type. Allowed types: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.join(', ')}`), false);
 	}
 
 	callback(null, true);
@@ -95,7 +96,7 @@ export class FileValidationInterceptor implements NestInterceptor {
 						invalidFormatFiles.push(`${fieldName}: ${file.originalname} (${fileExtension})`);
 					}
 
-					// Check file mimetype, but be more lenient with application/octet-stream for image files
+					// Check file mimetype
 					if (!FILE_UPLOAD_CONFIG.ALLOWED_FILE_TYPES.includes(file.mimetype)) {
 						invalidFormatFiles.push(
 							`File ${file.originalname} in field ${fieldName} has unsupported format (${file.mimetype}). Allowed formats: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_EXTENSIONS.join(', ')}`,
@@ -136,7 +137,12 @@ export class FileValidationInterceptor implements NestInterceptor {
 
 	private validateMagicNumber(file: Express.Multer.File): boolean {
 		const magicNumbers = FILE_UPLOAD_CONFIG.MAGIC_NUMBERS[file.mimetype as keyof typeof FILE_UPLOAD_CONFIG.MAGIC_NUMBERS];
-		if (!magicNumbers || !file.buffer || file.buffer.length < magicNumbers.length) {
+		if (!magicNumbers) {
+			// If no magic number is defined for this type (e.g., CSV), skip validation
+			return true;
+		}
+
+		if (!file.buffer || file.buffer.length < magicNumbers.length) {
 			return false;
 		}
 
@@ -216,7 +222,12 @@ export class SingleFileValidationInterceptor implements NestInterceptor {
 
 	private validateMagicNumber(file: Express.Multer.File): boolean {
 		const magicNumbers = FILE_UPLOAD_CONFIG.MAGIC_NUMBERS[file.mimetype as keyof typeof FILE_UPLOAD_CONFIG.MAGIC_NUMBERS];
-		if (!magicNumbers || !file.buffer || file.buffer.length < magicNumbers.length) {
+		if (!magicNumbers) {
+			// If no magic number is defined for this type (e.g., CSV), skip validation
+			return true;
+		}
+
+		if (!file.buffer || file.buffer.length < magicNumbers.length) {
 			return false;
 		}
 
